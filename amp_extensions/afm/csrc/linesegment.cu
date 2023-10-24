@@ -1,3 +1,4 @@
+//yjh
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 
@@ -36,11 +37,13 @@ __global__ void encode_kernel(const int nthreads, const float* lines,
         int vy_index = 5*height*width + h*width + w;
         int label_index = h*width + w;
 
-        float px = (float) w;
+        float px = (float) w;//px，py是端点坐标
         float py = (float) h;
         float min_dis = 1e30;
         int minp = -1;
+        int line_index = -1;//yjh 点被分配到直线line_index，未分配就是-1 
         bool flagp = true;
+        //对于每条线，计算g该点到线的距离
         for(int i = 0; i < num; ++i) {
             float xs = (float)width  /(float)input_width;
             float ys = (float)height /(float)input_height;
@@ -57,8 +60,8 @@ __global__ void encode_kernel(const int nthreads, const float* lines,
             float vy = y2 - py;
             float norm2 = dx*dx + dy*dy;
             bool flag = false;
-            float t = ((px-x1)*dx + (py-y1)*dy)/(norm2+1e-6);
-            if (t<=1 && t>=0.0)
+            float t = ((px-x1)*dx + (py-y1)*dy)/(norm2+1e-6);//计算像素到直线的距离
+            if (t<=1 && t>=0.0)//用来判断投影点在不在线上
                 flag = true;
 
             t = t<0.0? 0.0:t;
@@ -94,11 +97,14 @@ __global__ void encode_kernel(const int nthreads, const float* lines,
                 else
                     flagp = false;
 
-                tmap[index] = t;
+                //tmap[index] = t; 暂时用tmap记录分到直线
             }
         }
-        label[label_index+minp*height*width] = flagp;
-
+        label[label_index+minp*height*width] = flagp;//例 minp=0 该像素点属于第0条线段，label_index=true label_index+1*h*w=false 以此类推
+        if (flagp) //投影在线上
+            tmap[index] = minp;//记录线的标号
+        else
+            tmap[index] = -1; 
     }
 }
 
